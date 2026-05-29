@@ -1,0 +1,48 @@
+# /etc/nginx/sites-available/tiktok-tool
+#
+# 使い方:
+#   sudo cp tiktok-tool.nginx /etc/nginx/sites-available/tiktok-tool
+#   sudo ln -s /etc/nginx/sites-available/tiktok-tool /etc/nginx/sites-enabled/
+#   sudo nginx -t
+#   sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name yourdomain.com;  # ← 自分のドメインまたはIPに変更
+
+    # Let's Encrypt 用（certbot が自動で追記する）
+    # listen 443 ssl;
+    # ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    # アップロードサイズ上限（写真20枚 × 10MB を想定）
+    client_max_body_size 200M;
+
+    # ── フロントエンド（静的ファイル配信） ──────────────
+    root /var/www/tiktok-tool/frontend;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;  # SPAルーティング対応
+    }
+
+    # ── バックエンドAPI（リバースプロキシ） ─────────────
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # 動画生成は時間がかかるためタイムアウトを長めに設定
+        proxy_read_timeout    300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout    300s;
+    }
+
+    # ── セキュリティヘッダー ─────────────────────────
+    add_header X-Frame-Options       SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection      "1; mode=block";
+}

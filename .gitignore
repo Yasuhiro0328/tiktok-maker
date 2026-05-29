@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Frontend build outputs
+dist/
+build/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Runtime/generated media
+backend/temp/
+backend/uploads/
+backend/outputs/
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
