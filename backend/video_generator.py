@@ -179,7 +179,8 @@ def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         r"C:\Windows\Fonts\meiryob.ttc",   # Meiryo Bold
         r"C:\Windows\Fonts\YuGothB.ttc",   # Yu Gothic Bold
         r"C:\Windows\Fonts\NotoSansCJKjp-Bold.otf",
-        # Linux ボールド体
+        # Linux ボールド体 (Ubuntu/Debian: fonts-noto-cjk)
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Bold.otf",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
         # Mac ボールド体
@@ -191,9 +192,10 @@ def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         r"C:\Windows\Fonts\YuGothM.ttc",
         r"C:\Windows\Fonts\msgothic.ttc",
         r"C:\Windows\Fonts\NotoSansCJKjp-Regular.otf",
-        # Linux
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        # Linux (Ubuntu/Debian: fonts-noto-cjk)
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
         "/usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf",
         # Mac
