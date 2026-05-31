@@ -22,7 +22,7 @@ export async function startGenerate(req: GenerateRequest): Promise<string> {
   return data.jobId
 }
 
-export async function getStatus(jobId: string): Promise<{ status: string; progress: number; error?: string }> {
+export async function getStatus(jobId: string): Promise<{ status: string; progress: number; error?: string; queuePos?: number }> {
   const res = await fetch(`${BASE}/status/${jobId}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()

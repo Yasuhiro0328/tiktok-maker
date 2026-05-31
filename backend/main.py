@@ -13,10 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # ── 環境変数 ────────────────────────────────────────
-ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
-TEMP_DIR       = Path(os.environ.get("TEMP_DIR", "temp"))
-FILE_TTL_HOURS = int(os.environ.get("FILE_TTL_HOURS", "2"))
-MAX_UPLOAD_MB  = int(os.environ.get("MAX_UPLOAD_MB", "10"))
+ALLOWED_ORIGIN      = os.environ.get("ALLOWED_ORIGIN", "*")
+TEMP_DIR            = Path(os.environ.get("TEMP_DIR", "temp"))
+FILE_TTL_HOURS      = int(os.environ.get("FILE_TTL_HOURS", "2"))
+MAX_UPLOAD_MB       = int(os.environ.get("MAX_UPLOAD_MB", "10"))
+MAX_CONCURRENT_JOBS = int(os.environ.get("MAX_CONCURRENT_JOBS", "2"))
 
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -32,6 +33,8 @@ app.add_middleware(
 )
 
 jobs: dict = {}
+_semaphore: asyncio.Semaphore | None = None
+_waiting: list[str] = []  # 待機中のjob_id（順序付き）
 
 
 # ── モデル ───────────────────────────────────────────
@@ -91,6 +94,8 @@ async def upload_images(files: list[UploadFile] = File(...)):
 
 @app.post("/api/generate")
 async def generate_video(req: GenerateRequest, background_tasks: BackgroundTasks):
+    if not req.photos:
+        raise HTTPException(400, "写真が1枚以上必要です")
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         "status": "pending",
@@ -124,26 +129,51 @@ async def download_video(job_id: str):
 
 
 # ── バックグラウンド処理 ────────────────────────────
+def _update_queue_positions():
+    """待機リストの順位を全ジョブに反映する"""
+    for i, wid in enumerate(_waiting):
+        if wid in jobs:
+            jobs[wid]["queuePos"] = i + 1
+
+
 async def run_video_generation(job_id: str, req: GenerateRequest):
+    global _waiting
+
+    # セマフォが満杯なら待機キューに追加
+    if _semaphore._value == 0:
+        _waiting.append(job_id)
+        jobs[job_id]["status"] = "queued"
+        jobs[job_id]["queuePos"] = len(_waiting)
+
     try:
-        jobs[job_id]["status"] = "processing"
-        jobs[job_id]["progress"] = 10
+        async with _semaphore:
+            # セマフォ取得 → 待機リストから外して実行開始
+            if job_id in _waiting:
+                _waiting.remove(job_id)
+                _update_queue_positions()
 
-        from video_generator import generate_video
-        output_path = TEMP_DIR / f"{job_id}.mp4"
-        await generate_video(req, output_path, job_id, jobs)
+            jobs[job_id]["status"] = "processing"
+            jobs[job_id]["progress"] = 10
+            jobs[job_id]["queuePos"] = 0
 
-        jobs[job_id]["status"] = "done"
-        jobs[job_id]["progress"] = 100
+            from video_generator import generate_video
+            output_path = TEMP_DIR / f"{job_id}.mp4"
+            await generate_video(req, output_path, job_id, jobs)
 
-        # 完了後にアップロード元画像を削除
-        for photo in req.photos:
-            for ext in [".jpg", ".jpeg", ".png"]:
-                p = TEMP_DIR / f"{photo.fileId}{ext}"
-                p.unlink(missing_ok=True)
+            jobs[job_id]["status"] = "done"
+            jobs[job_id]["progress"] = 100
+
+            # 完了後にアップロード元画像を削除
+            for photo in req.photos:
+                for ext in [".jpg", ".jpeg", ".png"]:
+                    p = TEMP_DIR / f"{photo.fileId}{ext}"
+                    p.unlink(missing_ok=True)
 
     except Exception as e:
         import traceback
+        if job_id in _waiting:
+            _waiting.remove(job_id)
+            _update_queue_positions()
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = str(e) or repr(e)
         print(f"動画生成エラー [{job_id}]: {e}")
@@ -152,7 +182,9 @@ async def run_video_generation(job_id: str, req: GenerateRequest):
 
 # ── 定期クリーンアップ ──────────────────────────────
 @app.on_event("startup")
-async def start_cleanup_task():
+async def startup():
+    global _semaphore
+    _semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
     asyncio.create_task(cleanup_loop())
 
 

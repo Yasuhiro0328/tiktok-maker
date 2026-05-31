@@ -7,11 +7,12 @@ interface Props {
   photos: PhotoItem[]
 }
 
-type GenStatus = 'idle' | 'uploading' | 'generating' | 'done' | 'error'
+type GenStatus = 'idle' | 'uploading' | 'queued' | 'generating' | 'done' | 'error'
 
 export default function Step4Generate({ photos }: Props) {
   const [status, setStatus] = useState<GenStatus>('idle')
   const [progress, setProgress] = useState(0)
+  const [queuePos, setQueuePos] = useState(0)
   const [jobId, setJobId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [showPreview, setShowPreview] = useState(false)
@@ -21,6 +22,7 @@ export default function Step4Generate({ photos }: Props) {
   const handleGenerate = async () => {
     setStatus('uploading')
     setProgress(0)
+    setQueuePos(0)
     setErrorMsg('')
 
     try {
@@ -58,12 +60,16 @@ export default function Step4Generate({ photos }: Props) {
       await new Promise(r => setTimeout(r, 1500))
       const result = await getStatus(id)
       setProgress(result.progress || 0)
+      setQueuePos(result.queuePos ?? 0)
 
-      if (result.status === 'done') {
+      if (result.status === 'queued') {
+        setStatus('queued')
+      } else if (result.status === 'processing') {
+        setStatus('generating')
+      } else if (result.status === 'done') {
         setStatus('done')
         return
-      }
-      if (result.status === 'error') {
+      } else if (result.status === 'error') {
         throw new Error(result.error || '動画生成中にエラーが発生しました')
       }
     }
@@ -73,7 +79,41 @@ export default function Step4Generate({ photos }: Props) {
     <div className="step-content">
       <div className="step-header">
         <h2 className="step-title">確認・動画生成</h2>
-        <p className="step-desc">内容を確認して動画を生成します。</p>
+        <p className="step-desc">内容を最終確認して動画を生成します。完成したらダウンロードして TikTok にアップロードできます。</p>
+      </div>
+
+      <div className="step-tips">
+        <div className="step-tips-title">この画面でできること</div>
+        <div className="step-tips-grid">
+          <div className="step-tip-item">
+            <span className="step-tip-icon">👀</span>
+            <div>
+              <div className="step-tip-label">プレビュー確認</div>
+              <div className="step-tip-text">「▶ プレビューを確認する」で動画のイメージを確認できます。内容を修正したい場合は「← 戻る」で前の手順に戻れます。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">🎬</span>
+            <div>
+              <div className="step-tip-label">動画の生成</div>
+              <div className="step-tip-text">「🎬 動画を生成する」を押すと処理が始まります。写真の枚数によりますが、30秒〜2分程度かかります。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">⬇️</span>
+            <div>
+              <div className="step-tip-label">ダウンロード</div>
+              <div className="step-tip-text">生成完了後に「⬇ 動画をダウンロード」ボタンが表示されます。MP4ファイルとして保存されます。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">📱</span>
+            <div>
+              <div className="step-tip-label">TikTokへアップロード</div>
+              <div className="step-tip-text">ダウンロードしたMP4をTikTokアプリで投稿します。音楽はTikTok内で追加するのがおすすめです（著作権クリア済み楽曲が使えます）。</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* サマリー */}
@@ -122,6 +162,20 @@ export default function Step4Generate({ photos }: Props) {
         </div>
       )}
 
+      {/* 待機中 */}
+      {status === 'queued' && (
+        <div className="progress-section">
+          <div className="queue-badge">
+            <span className="queue-pos">{queuePos}</span>
+            <span className="queue-label">番目に待機中</span>
+          </div>
+          <p className="queue-desc">他のユーザーの動画生成が完了次第、自動的に開始されます。</p>
+          <div className="queue-dots">
+            <span /><span /><span />
+          </div>
+        </div>
+      )}
+
       {/* 進捗 */}
       {(status === 'uploading' || status === 'generating') && (
         <div className="progress-section">
@@ -156,7 +210,7 @@ export default function Step4Generate({ photos }: Props) {
           <div className="music-tip">
             🎵 TikTokアプリ内で音楽を追加すると、著作権をクリアした楽曲が使え、アルゴリズムにも有利です。
           </div>
-          <button className="btn-restart" onClick={() => { setStatus('idle'); setJobId(null); setProgress(0) }}>
+          <button className="btn-restart" onClick={() => { setStatus('idle'); setJobId(null); setProgress(0); setQueuePos(0) }}>
             別の動画を作る
           </button>
         </div>

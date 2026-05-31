@@ -154,6 +154,7 @@ export default function PreviewPlayer({ photos, onClose }: Props) {
                   left: `${t.x * 100}%`,
                   top: `${t.y * 100}%`,
                   fontSize: `${t.fontSize * SCALE}px`,
+                  fontFamily: 'Meiryo, "MS PGothic", "Noto Sans JP", sans-serif',
                   color: t.color,
                   fontWeight: t.bold ? 'bold' : 'normal',
                   textShadow: t.shadow && !t.background ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none',

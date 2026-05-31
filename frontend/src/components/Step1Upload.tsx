@@ -220,7 +220,41 @@ export default function Step1Upload({ photos, onPhotosChange }: Props) {
     <div className="step-content">
       <div className="step-header">
         <h2 className="step-title">写真を選ぶ</h2>
-        <p className="step-desc">最大20枚まで。ドラッグで順序変更、✂ で表示位置を調整できます。</p>
+        <p className="step-desc">動画にしたい写真をアップロードして、順番・表示時間・切り取り位置を設定します。</p>
+      </div>
+
+      <div className="step-tips">
+        <div className="step-tips-title">操作方法</div>
+        <div className="step-tips-grid">
+          <div className="step-tip-item">
+            <span className="step-tip-icon">🖱</span>
+            <div>
+              <div className="step-tip-label">写真を追加</div>
+              <div className="step-tip-text">下のエリアをクリックするか、写真ファイルをドラッグ＆ドロップして追加します（JPEG・PNG / 最大20枚）。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">⠿</span>
+            <div>
+              <div className="step-tip-label">順番を変える</div>
+              <div className="step-tip-text">写真カードの画像部分を掴んで左右にドラッグすると、動画の再生順を変えられます。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">⏱</span>
+            <div>
+              <div className="step-tip-label">表示時間を設定</div>
+              <div className="step-tip-text">各写真カード下部の数値を変えて、その写真を何秒表示するか設定します（1〜10秒）。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">✂</span>
+            <div>
+              <div className="step-tip-label">切り取り位置を調整</div>
+              <div className="step-tip-text">✂ボタンを押すと位置調整画面が開きます。横長の写真でどの部分を縦型に切り出すかドラッグで調整できます。</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>

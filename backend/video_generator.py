@@ -3,7 +3,7 @@ import subprocess
 import shutil
 import urllib.request
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 import tempfile
 import os
 
@@ -86,7 +86,7 @@ def compose_image(photo_path: Path, photo_config) -> Image.Image:
     """
     TARGET_W, TARGET_H = 1080, 1920
 
-    img = Image.open(photo_path).convert("RGB")
+    img = ImageOps.exif_transpose(Image.open(photo_path)).convert("RGB")
     img_w, img_h = img.size
     scale = max(TARGET_W / img_w, TARGET_H / img_h)
     new_w = int(img_w * scale)
@@ -104,24 +104,22 @@ def compose_image(photo_path: Path, photo_config) -> Image.Image:
     top  = max(0, min(max_top,  top))
     img = img.crop((left, top, left + TARGET_W, top + TARGET_H))
 
-    # テキスト合成（RGBAで透明度を正確に処理）
+    # テキスト合成（テキストごとに逐次compositeしてブラー影を正確に処理）
     texts = getattr(photo_config, 'texts', [])
     if texts:
         img_rgba = img.convert("RGBA")
-        text_layer = Image.new("RGBA", img_rgba.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(text_layer)
         for text_overlay in texts:
-            draw_text_overlay(draw, text_overlay, TARGET_W, TARGET_H)
-        img = Image.alpha_composite(img_rgba, text_layer).convert("RGB")
+            img_rgba = draw_text_overlay(img_rgba, text_overlay, TARGET_W, TARGET_H)
+        img = img_rgba.convert("RGB")
 
     return img
 
 
-def draw_text_overlay(draw: ImageDraw.Draw, overlay, width: int, height: int):
-    """テキストオーバーレイを描画"""
+def draw_text_overlay(img_rgba: Image.Image, overlay, width: int, height: int) -> Image.Image:
+    """テキストオーバーレイを描画してcomposite済みのRGBA画像を返す"""
     text = overlay.text
     if not text:
-        return
+        return img_rgba
 
     font_size = int(overlay.fontSize * (width / 1080))
     font = load_font(font_size, bold=overlay.bold)
@@ -129,7 +127,9 @@ def draw_text_overlay(draw: ImageDraw.Draw, overlay, width: int, height: int):
     x = int(overlay.x * width)
     y = int(overlay.y * height)
 
-    bbox = draw.textbbox((0, 0), text, font=font)
+    # テキストサイズ計測用の一時drawオブジェクト
+    _tmp = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    bbox = _tmp.textbbox((0, 0), text, font=font)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
@@ -143,32 +143,53 @@ def draw_text_overlay(draw: ImageDraw.Draw, overlay, width: int, height: int):
         bg_opacity = getattr(overlay, 'bgOpacity', 0.6)
         pad_x = max(10, font_size // 5)
         pad_y = max(6, font_size // 8)
-        bg_alpha = int(bg_opacity * 255)
-        draw.rectangle(
+        bg_layer = Image.new("RGBA", img_rgba.size, (0, 0, 0, 0))
+        ImageDraw.Draw(bg_layer).rectangle(
             [draw_x - pad_x, draw_y - pad_y,
              draw_x + text_w + pad_x, draw_y + text_h + pad_y],
-            fill=(0, 0, 0, bg_alpha)
+            fill=(0, 0, 0, int(bg_opacity * 255))
         )
+        img_rgba = Image.alpha_composite(img_rgba, bg_layer)
 
-    # 影（背景なし時のみ）
+    # ブラー影（背景なし時のみ）— フロントの blur:4 / textShadow 4px と揃える
     if overlay.shadow and not use_bg:
         shadow_offset = max(2, font_size // 20)
-        draw.text((draw_x + shadow_offset, draw_y + shadow_offset),
-                  text, font=font, fill=(0, 0, 0, 180))
+        blur_radius = max(2, font_size // 12)
+        shadow_layer = Image.new("RGBA", img_rgba.size, (0, 0, 0, 0))
+        ImageDraw.Draw(shadow_layer).text(
+            (draw_x + shadow_offset, draw_y + shadow_offset),
+            text, font=font, fill=(0, 0, 0, 200)
+        )
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        img_rgba = Image.alpha_composite(img_rgba, shadow_layer)
 
     # メインテキスト
     r, g, b = hex_to_rgb(overlay.color)
-    draw.text((draw_x, draw_y), text, font=font, fill=(r, g, b, 255))
+    text_layer = Image.new("RGBA", img_rgba.size, (0, 0, 0, 0))
+    ImageDraw.Draw(text_layer).text((draw_x, draw_y), text, font=font, fill=(r, g, b, 255))
+    img_rgba = Image.alpha_composite(img_rgba, text_layer)
+
+    return img_rgba
 
 
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    """日本語対応フォントを読み込む"""
-    font_candidates = [
+    """日本語対応フォントを読み込む。bold=True のときボールド体を優先する"""
+    bold_candidates = [
+        # Windows ボールド体
+        r"C:\Windows\Fonts\meiryob.ttc",   # Meiryo Bold
+        r"C:\Windows\Fonts\YuGothB.ttc",   # Yu Gothic Bold
+        r"C:\Windows\Fonts\NotoSansCJKjp-Bold.otf",
+        # Linux ボールド体
+        "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Bold.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+        # Mac ボールド体
+        "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",
+    ]
+    regular_candidates = [
         # Windows
-        r"C:\Windows\Fonts\msgothic.ttc",
         r"C:\Windows\Fonts\meiryo.ttc",
         r"C:\Windows\Fonts\YuGothM.ttc",
-        r"C:\Windows\Fonts\YuGothB.ttc",
+        r"C:\Windows\Fonts\msgothic.ttc",
         r"C:\Windows\Fonts\NotoSansCJKjp-Regular.otf",
         # Linux
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -179,7 +200,9 @@ def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
     ]
-    for path in font_candidates:
+
+    candidates = (bold_candidates + regular_candidates) if bold else regular_candidates
+    for path in candidates:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)

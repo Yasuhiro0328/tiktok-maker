@@ -83,7 +83,7 @@ function TextEditor({ photo, onUpdate }: { photo: PhotoItem; onUpdate: (p: Photo
       top: overlay.y * CANVAS_H,
       fontSize: overlay.fontSize / 4,
       fill: overlay.color,
-      fontFamily: 'sans-serif',
+      fontFamily: 'Meiryo, "MS PGothic", "Noto Sans JP", sans-serif',
       fontWeight: overlay.bold ? 'bold' : 'normal',
       shadow: overlay.shadow && !hasBg ? new fabric.Shadow({ color: 'rgba(0,0,0,0.7)', blur: 4, offsetX: 2, offsetY: 2 }) : null,
       backgroundColor: hasBg ? `rgba(0,0,0,${bgOpacity})` : '',
@@ -234,7 +234,41 @@ export default function Step2Text({ photos, onPhotosChange }: Props) {
     <div className="step-content">
       <div className="step-header">
         <h2 className="step-title">テキストを追加</h2>
-        <p className="step-desc">写真をクリックして選択し、テキストを追加・編集してください。</p>
+        <p className="step-desc">各写真にテキストを追加できます。テキストが不要な場合はそのまま「次へ」を押してください。</p>
+      </div>
+
+      <div className="step-tips">
+        <div className="step-tips-title">操作方法</div>
+        <div className="step-tips-grid">
+          <div className="step-tip-item">
+            <span className="step-tip-icon">🖼</span>
+            <div>
+              <div className="step-tip-label">① 写真を選ぶ</div>
+              <div className="step-tip-text">上部のサムネイルタブをクリックして、テキストを追加したい写真を選択します。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">＋</span>
+            <div>
+              <div className="step-tip-label">② テキストを追加</div>
+              <div className="step-tip-text">「＋ テキスト追加」ボタンを押すとプレビュー中央にテキストが追加されます。ドラッグで好きな位置に移動できます。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">✏️</span>
+            <div>
+              <div className="step-tip-label">③ 内容・スタイルを編集</div>
+              <div className="step-tip-text">テキストをクリックして選択すると右側にパネルが表示されます。文字・サイズ・色などを変更して「適用」ボタンを押してください。</div>
+            </div>
+          </div>
+          <div className="step-tip-item">
+            <span className="step-tip-icon">💡</span>
+            <div>
+              <div className="step-tip-label">読みやすくするコツ</div>
+              <div className="step-tip-text">「背景あり」にすると文字の後ろに黒い帯が入り、どんな写真の上でも読みやすくなります。「影あり」も視認性向上に効果的です。</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="photo-tabs">

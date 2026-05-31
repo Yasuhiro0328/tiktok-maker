@@ -3,6 +3,7 @@ import { PhotoItem, Step } from './types'
 import Step1Upload from './components/Step1Upload'
 import Step2Text from './components/Step2Text'
 import Step4Generate from './components/Step4Generate'
+import HelpModal from './components/HelpModal'
 import './App.css'
 
 const STEPS = [
@@ -14,6 +15,7 @@ const STEPS = [
 export default function App() {
   const [step, setStep] = useState<Step>(1)
   const [photos, setPhotos] = useState<PhotoItem[]>([])
+  const [showHelp, setShowHelp] = useState(false)
 
   const canNext = () => {
     if (step === 1) return photos.length > 0
@@ -27,7 +29,12 @@ export default function App() {
           <span className="logo-icon">🎬</span>
           <span className="logo-text">TikTok動画メーカー</span>
         </div>
+        <button className="btn-help" onClick={() => setShowHelp(true)}>
+          ？ 使い方
+        </button>
       </header>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
       {/* ステップインジケーター */}
       <div className="stepper">
